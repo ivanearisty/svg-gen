@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/svg_gen"]
+
+[project]
+name = "svg-gen"
+version = "0.1.0"
+description = "Text-to-SVG generation via LoRA fine-tuning — NYU DL Spring 2026 Kaggle Competition"
+# readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "modal>=0.73.0",
+    "pandas>=2.2.0",
+    "kaggle>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.17.0",
+    "ruff>=0.12.0",
+    "pandas-stubs>=2.2.0",
+    "types-requests>=2.32.0",
+    "types-tqdm>=4.67.0",
+]
+gpu = [
+    "torch>=2.5.0",
+    "transformers>=4.48.0",
+    "peft>=0.14.0",
+    "trl>=0.14.0",
+    "accelerate>=1.3.0",
+    "bitsandbytes>=0.45.0",
+    "datasets>=3.2.0",
+    "cairosvg>=2.7.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D203",   # incompatible with D211
+    "D213",   # incompatible with D212
+    "S101",   # assert is fine
+    "T201",   # print is fine for CLI/training scripts
+    "FBT001", # boolean positional args — common in ML configs
+    "FBT002", # boolean default values — common in ML configs
+    "ERA001", # commented-out code — useful during experimentation
+    "PLR0913",# too many arguments — ML functions often have many params
+    "PLC0415",# deferred imports — required for Modal remote functions
+    "PTH",    # os.path vs pathlib — os.path is fine for Modal volume paths
+]
+
+[tool.ruff.lint.per-file-ignores]
+"references/*" = ["ALL"]
+"stubs/**/*.pyi" = ["ANN401", "S105"]
+
+[tool.mypy]
+strict = true
+explicit_package_bases = true
+mypy_path = ["src", "stubs"]
+ignore_missing_imports = false
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = [
+    "modal.*",
+    "torch.*",
+    "transformers.*",
+    "peft.*",
+    "trl.*",
+    "accelerate.*",
+    "bitsandbytes.*",
+    "datasets.*",
+    "cairosvg.*",
+    "unsloth.*",
+]
+ignore_missing_imports = true

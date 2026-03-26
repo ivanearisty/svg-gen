@@ -1,0 +1,46 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tooling Caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# IDE files
+.vscode/
+.idea/
+
+# Data (too large for git)
+data/*.csv
+
+# Model outputs
+outputs/
+checkpoints/
+*.pt
+*.bin
+*.safetensors
+
+# Submissions
+submissions/
+
+# Secrets
+.env
+kaggle.json
+
+# Planning (local only)
+planning/
+
+# Sample outputs (inspection only)
+sample_outputs/
+
+# OS
+.DS_Store

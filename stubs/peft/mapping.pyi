@@ -1,0 +1,3 @@
+from typing import Any
+
+def get_peft_model(model: Any, peft_config: Any, **kwargs: Any) -> Any: ...
