@@ -36,8 +36,9 @@ submissions/
 .env
 kaggle.json
 
-# Planning (local only)
-planning/
+# Planning (local only, except journal)
+planning/*
+!planning/journal.md
 
 # Sample outputs (inspection only)
 sample_outputs/
