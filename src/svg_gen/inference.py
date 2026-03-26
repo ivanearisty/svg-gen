@@ -26,7 +26,7 @@ from svg_gen.modal_app import (
 def generate_batch(
     batch: list[tuple[str, str]],
     adapter_path: str,
-    inference_config: InferenceConfig,
+    inference_config: InferenceConfig,  # noqa: ARG001
     training_config: TrainingConfig,
 ) -> list[tuple[str, str, bool]]:
     """Generate SVGs for a batch of (id, prompt) pairs on a single GPU.

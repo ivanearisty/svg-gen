@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-import os
-
 from svg_gen.modal_app import VOLUME_MOUNT, app, gpu_image, volume
 
 
 @app.function(image=gpu_image, gpu="A100-40GB", timeout=10 * 60, volumes={VOLUME_MOUNT: volume})
 def debug_generate(adapter_path: str) -> str:
     """Generate 2 SVGs and print full raw output for debugging."""
+    import pandas as pd
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
     from svg_gen.config import SYSTEM_PROMPT
     from svg_gen.data import extract_svg, is_valid_svg, repair_svg
-
-    import pandas as pd
 
     bnb_config = BitsAndBytesConfig(  # type: ignore[no-untyped-call]
         load_in_4bit=True,

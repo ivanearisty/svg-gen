@@ -11,11 +11,10 @@ from svg_gen.modal_app import VOLUME_MOUNT, app, gpu_image, volume
 @app.function(image=gpu_image, gpu="A100-40GB", timeout=30 * 60, volumes={VOLUME_MOUNT: volume})
 def generate_samples(adapter_path: str, num_samples: int = 20) -> list[dict[str, str]]:
     """Generate SVGs and return them with prompts."""
+    import pandas as pd
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
-    import pandas as pd
 
     from svg_gen.config import SYSTEM_PROMPT
     from svg_gen.data import extract_svg, fallback_svg, is_valid_svg, normalize_viewbox, repair_svg
