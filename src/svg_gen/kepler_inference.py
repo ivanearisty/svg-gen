@@ -1,6 +1,6 @@
 """Standalone inference script for kepler (RTX 2000 Ada 16GB).
 
-No Modal dependency. Generates submission CSV locally.
+No Modal dependency. Uses Unsloth for faster inference. Generates submission CSV locally.
 
 Usage:
     python -m svg_gen.kepler_inference
@@ -16,11 +16,9 @@ import time
 
 import pandas as pd
 import torch
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from unsloth import FastLanguageModel
 
-from svg_gen.config import SYSTEM_PROMPT
-from svg_gen.data import extract_svg, fallback_svg, is_valid_svg, normalize_viewbox, repair_svg
+from svg_gen.data import extract_svg, fallback_svg, format_chat_prompt, is_valid_svg, normalize_viewbox, repair_svg
 
 
 def main() -> None:  # noqa: PLR0915
@@ -31,6 +29,7 @@ def main() -> None:  # noqa: PLR0915
     parser.add_argument("--test-csv", default="data/test.csv")
     parser.add_argument("--output", default="submissions/submission.csv")
     parser.add_argument("--max-new-tokens", type=int, default=1024)
+    parser.add_argument("--max-seq-length", type=int, default=2048)
     args = parser.parse_args()
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
@@ -40,23 +39,14 @@ def main() -> None:  # noqa: PLR0915
     print(f"Adapter: {args.adapter_path}")
     print(f"Max new tokens: {args.max_new_tokens}")
 
-    # --- Load model ---
-    bnb_config = BitsAndBytesConfig(
+    # --- Load model via Unsloth (faster inference than raw PEFT) ---
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=args.adapter_path,
+        max_seq_length=args.max_seq_length,
+        dtype=None,
         load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-        bnb_4bit_use_double_quant=True,
     )
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    base_model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-    )
-    model = PeftModel.from_pretrained(base_model, args.adapter_path)
-    model.eval()
+    FastLanguageModel.for_inference(model)
     print("Model loaded.")
 
     # --- Load test data ---
@@ -76,11 +66,7 @@ def main() -> None:  # noqa: PLR0915
             prompt = str(row.get("prompt", row.get("text", "")))
             sample_id = str(row.get("id", f"sample_{i}"))
 
-            chat_text = (
-                f"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n"
-                f"<|im_start|>user\n{prompt}<|im_end|>\n"
-                "<|im_start|>assistant\n"
-            )
+            chat_text = format_chat_prompt(prompt)
 
             inputs = tokenizer(chat_text, return_tensors="pt").to(model.device)
             with torch.no_grad():

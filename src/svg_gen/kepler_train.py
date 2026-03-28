@@ -22,8 +22,7 @@ from transformers import TrainingArguments
 from trl import SFTTrainer
 from unsloth import FastLanguageModel
 
-from svg_gen.config import SYSTEM_PROMPT
-from svg_gen.data import curate_training_data
+from svg_gen.data import curate_training_data, format_chat_prompt
 
 SEED = 42
 
@@ -63,15 +62,7 @@ def main() -> None:  # noqa: PLR0915
 
     # --- Format as chat ---
     def format_example(row: dict[str, str]) -> dict[str, str]:
-        svg = str(row.get("svg", ""))
-        prompt = str(row.get("prompt", ""))
-        return {
-            "text": (
-                f"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n"
-                f"<|im_start|>user\n{prompt}<|im_end|>\n"
-                f"<|im_start|>assistant\n{svg}<|im_end|>"
-            ),
-        }
+        return {"text": format_chat_prompt(str(row.get("prompt", "")), str(row.get("svg", "")))}
 
     dataset = Dataset.from_pandas(df)
     dataset = dataset.map(format_example, remove_columns=dataset.column_names)
@@ -90,15 +81,19 @@ def main() -> None:  # noqa: PLR0915
         load_in_4bit=True,
     )
 
+    # 7B Qwen models have untrained tool-calling tokens that cause NaN loss
+    # unless embed_tokens and lm_head are also trainable
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    if "7B" in args.model or "7b" in args.model:
+        target_modules.extend(["embed_tokens", "lm_head"])
+        print("7B model detected: adding embed_tokens + lm_head to target_modules (NaN fix)")
+
     model = FastLanguageModel.get_peft_model(
         model,
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=0,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
+        target_modules=target_modules,
         bias="none",
         use_gradient_checkpointing="unsloth",
         random_state=SEED,
@@ -106,6 +101,15 @@ def main() -> None:  # noqa: PLR0915
 
     # --- Training ---
     output_dir = os.path.join(args.output_dir, "checkpoints")
+    log_dir = os.path.join(args.output_dir, "logs")
+
+    # Scale save frequency: ~5 saves per epoch
+    effective_batch = args.batch_size * args.grad_accum
+    steps_per_epoch = max(1, len(train_ds) // effective_batch)
+    save_steps = max(100, steps_per_epoch // 5)
+    eval_steps = save_steps
+    print(f"Steps per epoch: {steps_per_epoch}, save/eval every {save_steps} steps")
+
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.epochs,
@@ -119,13 +123,14 @@ def main() -> None:  # noqa: PLR0915
         optim="paged_adamw_8bit",
         bf16=torch.cuda.is_bf16_supported(),
         fp16=not torch.cuda.is_bf16_supported(),
+        logging_dir=log_dir,
         logging_steps=10,
         eval_strategy="steps",
-        eval_steps=200,
-        save_steps=500,
-        save_total_limit=2,
+        eval_steps=eval_steps,
+        save_steps=save_steps,
+        save_total_limit=3,
         gradient_checkpointing=True,
-        report_to="none",
+        report_to="tensorboard",
         seed=SEED,
     )
 
@@ -134,6 +139,7 @@ def main() -> None:  # noqa: PLR0915
         processing_class=tokenizer,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
+        max_seq_length=args.max_seq_length,
         args=training_args,
     )
 

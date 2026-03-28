@@ -58,19 +58,15 @@ def collapse_whitespace(svg: str) -> str:
 
 
 def normalize_viewbox(svg: str, target_w: int = 256, target_h: int = 256) -> str:
-    """Ensure SVG has the competition-required viewBox and dimensions.
+    """Set SVG width/height for competition rendering without altering viewBox.
 
-    82% of training data uses viewBox='0.0 0.0 200.0 200.0'.
-    Competition renders at 256x256.
+    The viewBox defines the internal coordinate space (82% of training data
+    uses 0 0 200 200). Changing it would shrink/misalign content. Instead,
+    we only set width/height so the renderer scales the SVG to fill the
+    target canvas (256x256).
     """
     result = re.sub(r'width=["\'][^"\']*["\']', f'width="{target_w}"', svg, count=1)
-    result = re.sub(r'height=["\'][^"\']*["\']', f'height="{target_h}"', result, count=1)
-    return re.sub(
-        r'viewBox=["\'][^"\']*["\']',
-        f'viewBox="0 0 {target_w} {target_h}"',
-        result,
-        count=1,
-    )
+    return re.sub(r'height=["\'][^"\']*["\']', f'height="{target_h}"', result, count=1)
 
 
 def clean_svg(svg: str) -> str:

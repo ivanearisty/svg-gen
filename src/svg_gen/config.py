@@ -52,7 +52,7 @@ class TrainingConfig:
     max_seq_length: int = 2048
 
     # LoRA
-    lora: LoRAConfig = field(default_factory=LoRAConfig)
+    lora: LoRAConfig = field(default_factory=lambda: LoRAConfig(r=32, lora_alpha=64, lora_dropout=0))
 
     # Training
     num_train_epochs: int = 3
@@ -61,14 +61,14 @@ class TrainingConfig:
     learning_rate: float = 2e-4
     warmup_ratio: float = 0.05
     weight_decay: float = 0.01
-    max_grad_norm: float = 0.3
+    max_grad_norm: float = 1.0
     lr_scheduler_type: str = "cosine"
     optim: str = "paged_adamw_8bit"
 
     # Logging & saving
     logging_steps: int = 10
     save_steps: int = 200
-    save_total_limit: int = 2
+    save_total_limit: int = 3
     eval_steps: int = 100
 
     # Data
@@ -89,15 +89,15 @@ class TrainingConfig:
 class InferenceConfig:
     """Inference / generation configuration."""
 
-    max_new_tokens: int = 1536
-    temperature: float = 0.7
-    top_p: float = 0.9
-    repetition_penalty: float = 1.05
-    do_sample: bool = True
+    max_new_tokens: int = 1024
+    temperature: float = 0.0
+    top_p: float = 1.0
+    repetition_penalty: float = 1.1
+    do_sample: bool = False
 
 
 SYSTEM_PROMPT = (
     "You generate compact, valid SVG markup from user requests. "
     "Return only SVG code with a single root <svg> element. "
-    "Use viewBox='0 0 256 256' and keep the SVG under 16000 characters."
+    "Keep the SVG under 16000 characters."
 )
