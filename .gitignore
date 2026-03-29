@@ -1,4 +1,4 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
@@ -7,60 +7,42 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
 
-# Tooling Caches
+# Tooling caches
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 .coverage
+unsloth_compiled_cache/
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 
 # Data (too large for git)
-data/*.csv
+data/
 
-# Model outputs
+# Models (too large for git)
+models/
 outputs/
-checkpoints/
-*.pt
-*.bin
-*.safetensors
 
-# Submissions
-submissions/
+# Results (renders, submissions)
+results/
 
-# Secrets
-.env
-kaggle.json
+# Logs
+logs/
+*.log
+*.pid
 
 # Planning (local only, except journal and analysis)
 planning/*
 !planning/journal.md
 !planning/tokenizer-analysis.md
 
-# Sample outputs (inspection only)
-sample_outputs/
-
-# Audit renders
-audit_renders/
-audit.log
-
-# Logs and PIDs
-*.log
-*.pid
-
-# Unsloth cache
-unsloth_compiled_cache/
-
-# Merged/fine-tuned models (too large)
-models/merged-*/
-filtered-r16-3epoch/
-
-# External data
-data/external/
+# Secrets
+.env
+kaggle.json
 
 # OS
 .DS_Store
