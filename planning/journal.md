@@ -618,6 +618,48 @@ Cron job runs hourly at :17 to check progress (session-only, dies when Claude ex
 ### Outstanding TODOs
 - [ ] Write checkpoint inference script (load full model, not adapter)
 - [ ] Apply rel+int preprocessing to training data (currently training on 1-decimal absolute)
-- [ ] Launch kepler QLoRA training with expanded data
+- [x] Launch kepler QLoRA training with expanded data — **DONE, see below**
 - [ ] Submit r16-3epoch inference results to Kaggle for baseline score
 - [ ] Score first Thor checkpoint when it drops (~step 3540, ~7h in)
+
+### Kepler: Merge-and-Retrain (launched March 28 00:44 UTC)
+
+**Baseline result:** The r16-3epoch model (1.5B, filtered data, Modal-trained) placed **9th out of 58** on the Kaggle leaderboard. This is our best model so far.
+
+**Strategy: Merge + Re-LoRA** — instead of starting from scratch with 3B, we build on the proven 9th-place model:
+1. Merged the r=16 adapter into Qwen2.5-Coder-1.5B base weights (bakes 9th-place knowledge permanently)
+2. Applied a NEW r=32 LoRA on the merged model (2x trainable params: 37M vs 18M)
+3. Training on expanded dataset (76k samples from competition + SVGX + MMSVG-Icon)
+
+```
+Machine:       Kepler (RTX 2000 Ada, 16GB)
+Base:          models/merged-1.5b-r16 (Qwen2.5-Coder-1.5B with r16 knowledge baked in)
+Adapter:       NEW LoRA r=32, alpha=64
+Data:          train_expanded.csv (79,516 samples → 76,256 after curation)
+Epochs:        2
+Batch:         2 × 8 grad_accum = effective 16
+LR:            2e-4 (cosine)
+Steps:         9,532 total
+Speed:         ~5s/step
+Save every:    953 steps (~1.3h)
+ETA:           ~13h (finish ~2 PM March 28)
+```
+
+**Why this should work:**
+- The merged model already knows SVG syntax + coordinate patterns from r=16 training
+- Fresh r=32 adapter has double the capacity to learn new patterns
+- 76k samples (vs 46k originally) = more diverse training signal
+- The model starts from a proven baseline, not from scratch
+
+**Monitoring:**
+```bash
+tail -3 merge_train.log
+grep "loss" merge_train.log | tail -5
+```
+
+### Parallel Training Summary
+
+| Machine | Model | Approach | Data | ETA |
+|---|---|---|---|---|
+| **Kepler** | 1.5B (merged r16 + new r32) | QLoRA | 76k | ~2 PM Mar 28 |
+| **Thor** | 3B | Full fine-tune | 142k | ~Sun morning |

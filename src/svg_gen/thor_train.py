@@ -105,11 +105,11 @@ def main() -> None:  # noqa: PLR0915
     output_dir = os.path.join(args.output_dir, "checkpoints")
     log_dir = os.path.join(args.output_dir, "logs")
 
-    # Scale save frequency to dataset size: save ~5 times per epoch
+    # Save frequently — Thor crashes are common, don't lose progress
     effective_batch = args.batch_size * args.grad_accum
     steps_per_epoch = max(1, len(train_ds) // effective_batch)
-    save_steps = max(100, steps_per_epoch // 5)
-    eval_steps = save_steps
+    save_steps = 500
+    eval_steps = 500
     print(f"Steps per epoch: {steps_per_epoch}, save/eval every {save_steps} steps")
 
     training_args = TrainingArguments(
@@ -129,7 +129,7 @@ def main() -> None:  # noqa: PLR0915
         eval_strategy="steps",
         eval_steps=eval_steps,
         save_steps=save_steps,
-        save_total_limit=3,
+        save_total_limit=5,
         gradient_checkpointing=True,
         report_to="tensorboard",
         seed=SEED,

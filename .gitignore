@@ -36,12 +36,31 @@ submissions/
 .env
 kaggle.json
 
-# Planning (local only, except journal)
+# Planning (local only, except journal and analysis)
 planning/*
 !planning/journal.md
+!planning/tokenizer-analysis.md
 
 # Sample outputs (inspection only)
 sample_outputs/
+
+# Audit renders
+audit_renders/
+audit.log
+
+# Logs and PIDs
+*.log
+*.pid
+
+# Unsloth cache
+unsloth_compiled_cache/
+
+# Merged/fine-tuned models (too large)
+models/merged-*/
+filtered-r16-3epoch/
+
+# External data
+data/external/
 
 # OS
 .DS_Store
