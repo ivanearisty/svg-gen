@@ -40,6 +40,10 @@ planning/*
 !planning/journal.md
 !planning/tokenizer-analysis.md
 
+# Session handoff docs (local only)
+CLAUDE_HANDOFF.md
+KEPLER_TRAINING.md
+
 # Secrets
 .env
 kaggle.json
