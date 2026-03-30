@@ -663,3 +663,202 @@ grep "loss" merge_train.log | tail -5
 |---|---|---|---|---|
 | **Kepler** | 1.5B (merged r16 + new r32) | QLoRA | 76k | ~2 PM Mar 28 |
 | **Thor** | 3B | Full fine-tune | 142k | ~Sun morning |
+
+---
+
+## Day 5 — March 29: Thor Debugging & Stable Training
+
+### The Thor Process Kill Saga
+
+Spent most of the day debugging why training processes kept dying silently on the Thor after ~2-5 minutes. No error messages, no OOM in dmesg, no CUDA exceptions — processes just vanished.
+
+**What we tried and what failed:**
+
+| Attempt | Method | Result |
+|---|---|---|
+| 1 | `nohup` + `sg video` | Died at step ~25 (~2.5 min) |
+| 2 | `nohup` without `sg video` (groups are permanent) | Died at step ~25 |
+| 3 | `tmux` | Died at step ~67 (bs=2, seq=1536) |
+| 4 | `systemd-run --user --scope` | Died at step ~26 |
+| 5 | `screen` | Died at step ~30 |
+| 6 | Foreground run via SSH (with `timeout 300`) | **Survived all 5 minutes!** |
+
+The foreground run surviving while all background methods died was the key clue.
+
+**What we investigated:**
+- `ulimit -l` (memlock): was 15.3 GB → set to unlimited. Didn't fix it.
+- Swap: was 0 → added 32GB. Didn't fix it.
+- `loginctl enable-linger ivan`: enabled. Didn't fix it.
+- cgroup memory limits: all set to infinity/max. Not the issue.
+- Thermal: 38°C. Not the issue.
+- Kernel OOM killer: no entries in dmesg. Not the issue.
+- systemd-oomd: disabled on this platform. Not the issue.
+- Memory at crash time: 82GB free (!). Not OOM.
+
+**What we learned from research (agent):**
+- DGX Spark has a documented "zombie" issue — processes die without clean OOM errors
+- NVIDIA forums have multiple threads about this exact behavior
+- The recommended approach is Docker with `--runtime=nvidia --ulimit memlock=-1`
+- The community's "five-layer defense" includes: disable swap, flush caches, memory jails via cgroups, protect SSH with OOMScoreAdjust, memory watchdog
+
+**Root cause (most likely):** Combination of systemd session cleanup killing backgrounded processes AND unified memory fragmentation. The foreground SSH run survived because the PTY kept the session alive. Docker containers have their own process namespace and aren't subject to user session management.
+
+### The Fix: Docker
+
+Stopped all competing Docker containers (jrubin's Savant dev stack — RTSP sinks, replay, Pulsar) to free GPU memory on the shared unified pool. Then launched training inside the official NVIDIA PyTorch container:
+
+```bash
+sudo docker run -d --name svg-train \
+  --runtime=nvidia --ipc=host \
+  --ulimit memlock=-1 --ulimit stack=67108864 \
+  --memory=100g \
+  -v ~/WorkDir/svg-gen:/workspace \
+  -e HF_TOKEN=... -e PYTHONUNBUFFERED=1 \
+  -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+  -e PYTHONPATH=/workspace/src \
+  nvcr.io/nvidia/pytorch:25.04-py3-igpu \
+  bash -c 'pip install -q trl datasets peft accelerate bitsandbytes tensorboard cairosvg && \
+  python3 -m svg_gen.thor_train --train-csv data/train_expanded_large.csv --epochs 1 --batch-size 4 --grad-accum 2 --lr 2e-5'
+```
+
+**This worked.** Training survived past all previous crash points. Process has been running for hours.
+
+### FlashAttention Crash at Step 816
+
+After ~1.5h of successful training, crashed at eval step (step 500 checkpoint save + eval):
+```
+RuntimeError: FlashAttention only supports Ampere GPUs or newer.
+```
+
+Thor's SM 12.1 (Blackwell) isn't recognized by FlashAttention's GPU check. Fixed by adding `attn_implementation="sdpa"` to `AutoModelForCausalLM.from_pretrained()`. SDPA (Scaled Dot-Product Attention) works on all architectures.
+
+Training resumed from checkpoint-500. Loss continued from ~0.57.
+
+### Loss Curve (Full Fine-Tune)
+
+```
+Step   10: 1.243  (start)
+Step   20: 1.232
+Step  100: ~1.0
+Step  200: ~0.73
+Step  300: ~0.68
+Step  500: ~0.57   ← checkpoint saved
+Step  700: ~0.58   (resumed from checkpoint-500)
+Step  800: ~0.57
+```
+
+**Loss is already at 0.57 — well below the LoRA plateau of ~0.34.** Full fine-tune hypothesis confirmed: the LoRA bottleneck WAS limiting coordinate learning. Token accuracy: 81%.
+
+### Revised Training Configuration (Final)
+
+```
+Machine:       DGX Spark (NVIDIA Thor, 128GB unified)
+Runtime:       Docker (nvcr.io/nvidia/pytorch:25.04-py3-igpu)
+Model:         Qwen/Qwen2.5-Coder-3B-Instruct (full bf16, SDPA attention)
+Data:          train_expanded_large.csv (149,516 → 141,618 after curation)
+Epochs:        1
+Batch size:    4 (effective batch 8, grad_accum=2)
+Learning rate: 2e-5 (cosine schedule, 10% warmup)
+Optimizer:     AdamW (full)
+Steps/epoch:   17,703
+Save every:    500 steps (~45 min, keeps latest 5)
+Speed:         ~5.5s/step
+```
+
+### Training Schedule
+
+| Window | Hours | Est. steps | Cumulative |
+|---|---|---|---|
+| Sunday night (now → Mon 9am) | ~12h | ~7,800 | ~8,300 |
+| Mon 6pm → Tue 9am | 15h | ~9,800 | ~17,700+ |
+| Tue 6pm | Inference + submit | — | — |
+
+Full epoch should complete by Tuesday morning. Inference Tuesday evening (~3-4h on Thor), submit before midnight.
+
+### Operations
+
+**Pause training (Mon morning):**
+```bash
+ssh ivan@192.168.5.194 "sudo docker stop svg-train"
+```
+Docker stop sends SIGTERM → Trainer saves checkpoint → container stops cleanly.
+
+**Resume training (Mon evening):**
+```bash
+ssh ivan@192.168.5.194 "sudo docker start svg-train"
+```
+Container resumes, Trainer auto-detects latest checkpoint, continues.
+
+**Restart jrubin's containers after training is done:**
+```bash
+ssh ivan@192.168.5.194 "cd /home/jrubin/dev-jrubin/intenseye && sudo docker compose up -d"
+```
+
+**Monitor:**
+```bash
+ssh ivan@192.168.5.194 "sudo docker logs svg-train --tail 3"
+```
+
+### Project Cleanup
+
+Reorganized the project directory — moved standalone scripts to `scripts/`, logs to `logs/`, results to `results/`. Cleaned .gitignore. Freed 70GB on kepler's disk (HF cache, pip cache, downloads, playwright).
+
+### Other Changes
+- Added `attn_implementation="sdpa"` to thor_train.py (FlashAttention doesn't support Blackwell SM 12.1)
+- Set `save_steps=500`, `save_total_limit=5` for more frequent checkpoints
+- Added unlimited memlock to `/etc/security/limits.conf` on Thor
+- Protected SSH daemon with `OOMScoreAdjust=-1000` on Thor
+- Installed `ncdu` on kepler for disk usage analysis
+
+### Kepler Merge+R32 Training Results
+
+Training completed after 13.6h (9,532 steps, 2 epochs).
+
+**Loss curve:**
+```
+Step     0: 0.53  (new r=32 adapter starts from zero on merged base)
+Step  1000: 0.51
+Step  2000: 0.51
+Step  3000: 0.48
+Step  4000: 0.47  (end of epoch 1)
+Step  5000: 0.46
+Step  6000: 0.45
+Step  7000: 0.40  (lowest point)
+Step  8500: 0.44
+Step  9532: 0.465 (final, LR nearly zero)
+```
+
+**Final train loss: 0.465.** Higher than the r=16 model's 0.34, but these aren't comparable — different dataset (76k mixed vs 46k competition-only), different preprocessing (rel+int vs 1-decimal absolute), different coordinate format. The only fair comparison is the competition score.
+
+Adapter saved to `outputs/final-adapter`, base model at `models/merged-1.5b-r16`.
+
+### Inference — Crashed and Resumed
+
+Launched inference on merged+r32 model. Crashed at sample 590/1000 due to disk full (`OSError: [Errno 28] No space left on device`). The other session's project cleanup freed disk space.
+
+Wrote `scripts/resume_inference.py` — recovers 585 valid samples from the corrupted CSV, generates only the remaining 415. Resumed and running (~70min ETA).
+
+Output: `results/submissions/merged-r32-expanded-complete.csv`
+
+### Simple SVG Training Subset
+
+Created `data/train_simple.csv` — **48,055 samples** filtered for complexity the model can realistically generate fully:
+- ≤600 Qwen tokens
+- ≤80 path commands
+- ≤20 SVG elements
+
+Source breakdown: 29k competition (60%), 11k SVGX (22%), 8k MMSVG (17%).
+
+**Plan:** After inference completes, merge current r32 adapter into base, apply fresh r32, train 2 epochs on just the simple subset. This "specialist sharpening" pass should boost scores on the majority of test prompts that are simple/medium icons.
+
+### Training Stack Summary (3 rounds of learning)
+
+```
+Round 1: Qwen2.5-Coder-1.5B + LoRA r=16, 46k competition data     → 9th place
+         ↓ merge adapter into weights
+Round 2: Merged-1.5B + LoRA r=32, 76k expanded data                → inference running
+         ↓ merge adapter into weights (planned)
+Round 3: Merged-1.5B-v2 + LoRA r=32, 48k simple SVGs only          → planned next
+```
+
+Each round bakes the previous knowledge permanently and adds fresh capacity.
