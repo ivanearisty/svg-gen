@@ -31,8 +31,8 @@ A Multi-Machine Training and Ablation Study}
 \begin{abstract}
 We present a system for generating Scalable Vector Graphics (SVG) code from natural language prompts, developed for the DL Spring 2026 Kaggle competition. Our approach fine-tunes Qwen2.5-Coder-1.5B-Instruct using QLoRA adapters and iterative merge-and-retrain, achieving 6th place (16.87/100) on a 58-team leaderboard. We conduct extensive ablation studies across 10 experiments on a held-out validation set, revealing that the system prompt is the single most critical inference component (35-point impact), followed by fine-tuning (7.3 points) and token generation budget (4 points). We additionally find that LoRA adapters slightly outperform full fine-tuning despite higher cross-entropy loss, and that minimal system prompts outperform verbose ones. Training was conducted across two machines: an NVIDIA RTX 2000 Ada (16GB) for QLoRA and an NVIDIA DGX Spark (128GB unified memory) for full fine-tuning. Code, model weights, and experiment logs are publicly available.
 
-\textbf{GitHub:} \url{https://github.com/ivanearisty/svg-gen} \\
-\textbf{Model Weights:} \url{https://huggingface.co/ivanearisty/svg-gen-weights}
+\noindent\textbf{GitHub:} \url{https://github.com/ivanearisty/svg-gen} \\
+\textbf{Model Weights:} \url{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights}
 \end{abstract}
 
 % ==============================================================================
@@ -390,6 +390,36 @@ Several promising directions remain unexplored due to time constraints:
 \subsection{AI Tooling Disclosure}
 
 Claude Code (Anthropic) was used extensively throughout this project for code generation, debugging, experiment orchestration, and this report. Specific contributions include: training scripts, inference pipelines, ablation automation, DGX Spark Docker debugging, and figure generation. All AI-generated code was reviewed and understood before use.
+
+\subsection{Code and Model Artifacts}
+
+All code and model weights are publicly available:
+
+\begin{itemize}
+    \item \textbf{GitHub Repository:} \url{https://github.com/ivanearisty/svg-gen} --- training scripts, inference pipelines, ablation automation, preprocessing, scoring, and this report's \LaTeX{} source.
+    \item \textbf{Model Weights (HuggingFace):} \url{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights} --- all trained models listed below.
+\end{itemize}
+
+\noindent Table~\ref{tab:model-artifacts} lists all model artifacts with direct links.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{p{2.8cm}p{1.2cm}r}
+\toprule
+\textbf{Model} & \textbf{Type} & \textbf{Kaggle} \\
+\midrule
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/componly-r32-adapter}{\texttt{componly-r32-adapter}} & Adapter & \textbf{16.87} \\
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/merged-1.5b-r16}{\texttt{merged-1.5b-r16}} & Full & (base) \\
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/refined-7000}{\texttt{refined-7000}} & Full & 16.26 \\
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/r16-3epoch}{\texttt{r16-3epoch}} & Adapter & 15.47 \\
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/mixed-r32-adapter}{\texttt{mixed-r32-adapter}} & Adapter & 14.64 \\
+\href{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights/tree/main/codegen-1.5b}{\texttt{codegen-1.5b}} & Full & 12.26 \\
+\bottomrule
+\end{tabular}
+\caption{Model artifacts on HuggingFace. The best model (\texttt{componly-r32-adapter}) requires \texttt{merged-1.5b-r16} as its base. All other full models are standalone.}
+\label{tab:model-artifacts}
+\end{table}
 
 % ==============================================================================
 % References
