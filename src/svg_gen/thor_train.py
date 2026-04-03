@@ -20,9 +20,15 @@ import time
 import numpy as np
 import pandas as pd
 import torch
+from torch.nn.functional import scaled_dot_product_attention  # noqa: F401
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 from trl import SFTTrainer
+
+# Thor/Blackwell SM 12.1: FlashAttention kernel crashes.
+# Force SDPA to use math backend instead of dispatching to FA.
+torch.backends.cuda.enable_flash_sdp(False)
+torch.backends.cuda.enable_mem_efficient_sdp(True)
 
 from svg_gen.data import curate_training_data, format_chat_prompt
 
@@ -85,6 +91,7 @@ def main() -> None:  # noqa: PLR0915
         args.model,
         torch_dtype=torch.bfloat16,
         device_map="auto",
+        attn_implementation="sdpa",  # FlashAttention crashes on Thor/Blackwell SM 12.1
     )
 
     # Enable gradient checkpointing to save memory
@@ -126,8 +133,7 @@ def main() -> None:  # noqa: PLR0915
         bf16=True,
         # logging_dir=log_dir,  # deprecated in trl 0.29+
         logging_steps=10,
-        eval_strategy="steps",
-        eval_steps=eval_steps,
+        eval_strategy="no",  # Disabled — FlashAttention crashes on Thor during eval
         save_steps=save_steps,
         save_total_limit=5,
         gradient_checkpointing=True,
