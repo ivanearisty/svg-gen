@@ -41,8 +41,6 @@ We present a system for generating Scalable Vector Graphics (SVG) code from natu
 
 Scalable Vector Graphics (SVG) is a resolution-independent image format defined by XML markup, widely used for icons, logos, and web graphics. Unlike raster formats, SVGs encode visual content as geometric primitives (paths, shapes, transforms) with explicit coordinate specifications. This structural nature makes SVG generation an interesting challenge for language models: the output must be both syntactically valid XML \textit{and} visually faithful to a natural language description.
 
-The DL Spring 2026 Kaggle competition tasks participants with building systems that generate SVG code from text prompts. The scoring metric is a weighted geometric mean of visual fidelity (85\%, measured by SSIM and Edge F1), structural similarity (12\%, tree edit distance), and compactness (3\%, length ratio). This metric heavily rewards pixel-level visual accuracy, making it fundamentally different from typical text generation tasks where semantic correctness suffices.
-
 Our approach fine-tunes a small (1.5B parameter) code-specialized language model using QLoRA \citep{dettmers2023qlora}, with several key technical contributions:
 
 \begin{enumerate}
@@ -60,7 +58,7 @@ We achieve a final public leaderboard score of 16.87/100.
 
 \subsection{Competition Data}
 
-The provided training dataset contains 50,000 (prompt, SVG) pairs. Prompts are short natural language descriptions (mean $\sim$100 characters, $\sim$30 tokens) of icons and simple scenes. SVGs range from 91 to 15,937 characters (median 2,110), with 82\% using a \texttt{viewBox} of \texttt{0 0 200 200}. The data is remarkably clean: only 7 exact SVG duplicates and 0 XML parse failures.
+The provided training dataset contains 50,000 (prompt, SVG) pairs. Prompts are short natural language descriptions (mean $\sim$100 characters, $\sim$30 tokens) of icons and simple scenes. SVGs range from 91 to 15,937 characters (median 2,110), with 82\% using a \texttt{viewBox} of \texttt{0 0 200 200}.
 
 \textbf{SVG structure:} The vast majority of training samples are single-path icons --- 49.4\% contain a single complex \texttt{<path>} element, and 47.7\% are multi-element compositions with paths. Only 2.9\% are basic shapes (rectangles, circles). Path elements use cubic B\'{e}zier curves (\texttt{C} commands with 6 coordinates each), making coordinate efficiency the primary challenge.
 
@@ -76,11 +74,11 @@ We apply four preprocessing steps to all training SVGs, ordered by impact:
     \item \textbf{Whitespace collapse:} Normalize redundant spaces and blank lines.
 \end{enumerate}
 
-After cleaning, we filter SVGs by token count: any sample exceeding 1,900 Qwen tokens is removed, ensuring every training example fits completely within the 2,048-token context window. This is critical --- the model must observe the closing \texttt{</svg>} tag during training to learn when to stop generating. The filtered dataset retains 45,874 samples (91.7\%).
+After cleaning, we filter SVGs by token count: any sample exceeding 1,900 Qwen tokens is removed, ensuring every training example fits completely within the 2,048-token context window. This is critical since the model must observe the closing \texttt{</svg>} tag during training to learn when to stop generating. The filtered dataset retains 45,874 samples (91.7\%).
 
 \subsection{External Data Experiment}
 
-The competition permits external datasets. We curated additional samples from SVGX-SFT-1M \citep{xingxm2024svgx} and OmniSVG/MMSVG-Icon \citep{omnisvg2024}, creating expanded datasets of 79,516 (kepler) and 149,516 (Thor) samples. However, as detailed in Section~\ref{sec:external-data}, external data consistently degraded competition performance due to distribution mismatch.
+The competition permits external datasets. We curated additional samples from SVGX-SFT-1M \citep{xingxm2024svgx} and OmniSVG/MMSVG-Icon \citep{omnisvg2024}, creating expanded datasets of 79,516 (kepler) and 149,516 (Thor) samples. However, as detailed in Section~\ref{sec:external-data}, external data consistently degraded competition performance due to distribution mismatch. We ultimately trained our final models on competition-only data, and our highest-scoring model (16.87) was trained on the 45k filtered dataset without any external samples.
 
 \subsection{Tokenization Challenge}
 \label{sec:tokenization}
