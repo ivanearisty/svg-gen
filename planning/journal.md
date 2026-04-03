@@ -1338,10 +1338,37 @@ The local ablation rankings are consistent with Kaggle submissions:
 | rep=1.1 ≈ rep=1.0 | 53.79 ≈ 54.21 | 16.87 ≈ 16.51 (rep=1.05) | Yes |
 | More tokens helps | 51.47 → 55.50 | 1536-tok was biggest best-of-N contributor | Yes |
 
+### System Prompt Sensitivity Analysis
+
+The system prompt was the most impactful component (-35 points when removed), yet we never varied its content during the competition. Post-hoc analysis with 2 alternative prompts reveals an inverse relationship between prompt specificity and quality:
+
+| Variant | System Prompt | Score | Delta | Invalid |
+|---|---|---|---|---|
+| none | *(no system prompt)* | 18.80 | -34.99 | 192 |
+| **specific** | "You generate SVG icons using path elements in a 200x200 viewBox. Return only the \<svg\> element with xmlns, viewBox, width, and height attributes. Always close with \</svg\>. Keep paths compact." | 51.66 | -2.13 | 1 |
+| **original** | "You generate compact, valid SVG markup from user requests. Return only SVG code with a single root \<svg\> element. Keep the SVG under 16000 characters." | **53.79** | — | 2 |
+| **minimal** | "Output valid SVG code only." | **54.57** | +0.78 | 1 |
+
+**Finding:** Less is more. The minimal 6-word prompt outperforms the original 3-sentence prompt by 0.78 points. The highly specific prompt (mentioning viewBox, path elements, closing tags) scores 2.13 points *below* baseline. Over-constraining the model with specific structural instructions appears to interfere with patterns learned during fine-tuning. The model already knows SVG structure from training — the system prompt only needs to signal "produce SVG" without micromanaging *how*.
+
+**Implication:** System prompt tuning should have been part of our hyperparameter search during the competition. The 0.78-point improvement from switching to the minimal prompt could have translated to a meaningful Kaggle improvement (our submissions ranged 15.47–16.87, a 1.4-point total spread).
+
+### Figures
+
+6 publication-quality figures generated in `results/figures/`:
+- `fig1_ablation_bar_chart.png` — Main ablation results
+- `fig2_token_budget.png` — Token budget vs quality (linear relationship)
+- `fig3_loss_curves.png` — Training loss across 4 approaches
+- `fig4_component_importance.png` — Waterfall chart of component impact
+- `fig5_kaggle_progression.png` — Kaggle submission history
+- `fig6_sub_metrics.png` — Sub-metric comparison across key ablations
+
 ### Scripts
 
 - `scripts/create_val_split.py` — Creates stratified 200-sample val set
 - `scripts/run_ablation.py` — Runs a single ablation variant (inference + scoring)
 - `scripts/run_ablation_refined.py` — Variant for full fine-tune model (loads differently)
+- `scripts/run_sysprompt_ablation.py` — System prompt sensitivity analysis
 - `scripts/orchestrate_ablations.py` — Runs all 8 ablations sequentially
+- `scripts/generate_figures.py` — Generates all paper figures
 - Results in `results/ablations/` — per-ablation JSON scores + prediction CSVs
