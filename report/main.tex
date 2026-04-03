@@ -29,7 +29,7 @@ A Multi-Machine Training and Ablation Study}
 \maketitle
 
 \begin{abstract}
-We present a system for generating Scalable Vector Graphics (SVG) code from natural language prompts, developed for the DL Spring 2026 Kaggle competition. Our approach fine-tunes Qwen2.5-Coder-1.5B-Instruct using QLoRA adapters and iterative merge-and-retrain, achieving 6th place (16.87/100) on a 58-team leaderboard. We conduct extensive ablation studies across 10 experiments on a held-out validation set, revealing that the system prompt is the single most critical inference component (35-point impact), followed by fine-tuning (7.3 points) and token generation budget (4 points). We additionally find that LoRA adapters slightly outperform full fine-tuning despite higher cross-entropy loss, and that minimal system prompts outperform verbose ones. Training was conducted across two machines: an NVIDIA RTX 2000 Ada (16GB) for QLoRA and an NVIDIA DGX Spark (128GB unified memory) for full fine-tuning. Code, model weights, and experiment logs are publicly available.
+We present a system for generating Scalable Vector Graphics (SVG) code from natural language prompts, developed for the DL Spring 2026 Kaggle competition. Our approach fine-tunes Qwen2.5-Coder-1.5B-Instruct using QLoRA adapters and iterative merge-and-retrain, achieving a public leaderboard score of 16.87/100. We conduct extensive ablation studies across 10 experiments on a held-out validation set, revealing that the system prompt is the single most critical inference component (35-point impact), followed by fine-tuning (7.3 points) and token generation budget (4 points). We additionally find that LoRA adapters slightly outperform full fine-tuning despite higher cross-entropy loss, and that minimal system prompts outperform verbose ones. Training was conducted across two machines: an NVIDIA RTX 2000 Ada (16GB) for QLoRA and an NVIDIA DGX Spark (128GB unified memory) for full fine-tuning. Code, model weights, and experiment logs are publicly available.
 
 \noindent\textbf{GitHub:} \url{https://github.com/ivanearisty/svg-gen} \\
 \textbf{Model Weights:} \url{https://huggingface.co/kaleidoscopicwhether/svg-gen-weights}
@@ -52,7 +52,7 @@ Our approach fine-tunes a small (1.5B parameter) code-specialized language model
     \item \textbf{System prompt sensitivity analysis:} Demonstrating an inverse relationship between prompt verbosity and generation quality for fine-tuned models.
 \end{enumerate}
 
-We achieve a final score of 16.87/100 (6th place out of 58 teams), with a 1.46-point gap to the competition leader (18.33/100).
+We achieve a final public leaderboard score of 16.87/100.
 
 % ==============================================================================
 \section{Dataset}
@@ -117,10 +117,10 @@ We also evaluated 3B and 7B Qwen variants. The 3B model was used for full fine-t
 Our training strategy evolved through three rounds:
 
 \textbf{Round 1 --- LoRA r=16 (Modal A100):}
-Initial fine-tuning with rank-16 LoRA adapters on 45,874 competition samples for 3 epochs. This established our first baseline (Kaggle score: 15.47, 9th place). Training used 4-bit NF4 quantization via Unsloth \citep{unsloth2024}, \texttt{paged\_adamw\_8bit} optimizer, learning rate $2 \times 10^{-4}$ with cosine schedule.
+Initial fine-tuning with rank-16 LoRA adapters on 45,874 competition samples for 3 epochs. This established our first baseline (Kaggle score: 15.47). Training used 4-bit NF4 quantization via Unsloth \citep{unsloth2024}, \texttt{paged\_adamw\_8bit} optimizer, learning rate $2 \times 10^{-4}$ with cosine schedule.
 
 \textbf{Round 2 --- Merge + LoRA r=32 (kepler RTX 2000 Ada):}
-We merge the Round 1 adapter into the base weights, permanently baking the 9th-place knowledge into the model parameters. A fresh rank-32 LoRA adapter (2$\times$ trainable parameters: 37M vs.\ 18M) is then applied to the merged model. This was trained on 45,000 competition-only samples for 2 epochs. Score: \textbf{16.87} (6th place) --- our best result, representing a +1.4 point improvement from the merge-and-retrain technique alone.
+We merge the Round 1 adapter into the base weights, permanently baking the Round 1 knowledge into the model parameters. A fresh rank-32 LoRA adapter (2$\times$ trainable parameters: 37M vs.\ 18M) is then applied to the merged model. This was trained on 45,000 competition-only samples for 2 epochs. Score: \textbf{16.87} --- our best result, representing a +1.4 point improvement from the merge-and-retrain technique alone.
 
 \textbf{Round 3 --- Full Fine-Tune (Thor DGX Spark):}
 We merged the Round 2 adapter and performed full fine-tuning (all 1.5B parameters trainable) on the DGX Spark's 128GB unified memory. This achieved the lowest cross-entropy loss (0.308 vs.\ LoRA's 0.34 floor) but scored only 16.26 on Kaggle --- \textit{worse} than the LoRA model. See Section~\ref{sec:lora-vs-ft} for analysis.
@@ -212,7 +212,7 @@ We generated multiple SVGs per prompt across 4 inference runs with different set
 
 \subsection{Kaggle Competition Results}
 
-Table~\ref{tab:kaggle-results} shows all 9 Kaggle submissions. Our best score of 16.87 placed 6th out of 58 teams, 1.46 points behind the leader (18.33).
+Table~\ref{tab:kaggle-results} shows all 9 Kaggle submissions. Our best public leaderboard score was 16.87.
 
 \begin{table}[h]
 \centering
@@ -221,9 +221,9 @@ Table~\ref{tab:kaggle-results} shows all 9 Kaggle submissions. Our best score of
 \toprule
 \textbf{Submission} & \textbf{Score} & \textbf{Notes} \\
 \midrule
-LoRA r=16, 3ep & 15.47 & First submit, 9th \\
+LoRA r=16, 3ep & 15.47 & First submission \\
 r=32, 76k mixed & 14.64 & External data hurt \\
-r=32, 45k comp & \textbf{16.87} & \textbf{Best --- 6th place} \\
+r=32, 45k comp & \textbf{16.87} & \textbf{Best public score} \\
 temp=0.05 & 16.42 & Sampling hurts \\
 rep=1.05 & 16.51 & Lower penalty hurts \\
 rep=1.15 & 15.88 & Higher penalty hurts \\
