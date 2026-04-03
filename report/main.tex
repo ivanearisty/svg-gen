@@ -87,11 +87,14 @@ The competition permits external datasets. We curated additional samples from SV
 
 A fundamental bottleneck in our approach is Qwen2.5-Coder's digit-level tokenization. The tokenizer splits every digit and punctuation mark into separate tokens:
 
+{\small
 \begin{verbatim}
-SVG text:    M 156.3 42.8
-Qwen tokens: [M][ ][1][5][6][.][3][ ][4][2][.][8]
-Count:       12 tokens
+SVG text:  M 156.3 42.8
+Qwen:      [M][ ][1][5][6][.][3]
+           [ ][4][2][.][8]
+Count:     12 tokens
 \end{verbatim}
+}
 
 By contrast, GPT-2-style tokenizers encode multi-digit numbers as single tokens (\texttt{156} $\rightarrow$ 1 token), achieving $\sim$5 tokens for the same input. This means Qwen uses 2--3$\times$ more tokens for SVG coordinates than necessary, consuming context window capacity on digit sequences rather than structural patterns.
 
@@ -344,14 +347,16 @@ This disconnect between CE loss and visual quality stems from three factors:
 
 For completeness, the competition scoring formula used for our local ablation evaluation:
 
+{\small
 \begin{align}
-V_i &= 0.7 \cdot \text{SSIM}(I(p_i), I(g_i)) + 0.3 \cdot \text{EdgeF1}(I(p_i), I(g_i)) \\
-S_i &= \exp\left(-\frac{\text{TED}(A(p_i), A(g_i))}{25}\right) \\
-C_i &= \exp\left(-\left|\log\frac{\text{len}(p_i) + 50}{\text{len}(g_i) + 50}\right|\right) \\
+V_i &= 0.7 \cdot \text{SSIM}(I_p, I_g) \nonumber \\
+    &\quad + 0.3 \cdot \text{EdgeF1}(I_p, I_g) \\
+S_i &= \exp\!\left(-\tfrac{\text{TED}(A_p, A_g)}{25}\right) \\
+C_i &= \exp\!\left(-\left|\log\tfrac{\text{len}(p_i) + 50}{\text{len}(g_i) + 50}\right|\right) \\
 Q_i &= V_i^{0.85} \cdot S_i^{0.12} \cdot C_i^{0.03}
 \end{align}
-
-where $I(\cdot)$ renders SVG to a 256$\times$256 grayscale image and $A(\cdot)$ extracts the XML tree structure.
+}
+where $I_p, I_g$ render predicted/reference SVGs to 256$\times$256 grayscale images and $A_p, A_g$ extract XML tree structures.
 
 % ==============================================================================
 \section{Conclusion}
